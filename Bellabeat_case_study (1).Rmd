@@ -1,0 +1,261 @@
+---
+title: "Google Data Analytics - Bellabeat Case Study"
+author: "Jed Ofori"
+date: "20/02/2022"
+output: pdf_document
+fontsize: 12
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy.opts=list(width.cutoff=90), echo = TRUE)
+```
+
+
+## Business problem
+#### I am a junior data analyst, part of the marketing analytics team at Bellabeat, a high-tech manufacturer of health-orientated products for women. Bellabeat is a successful small company, but they have the potential to become a larger figure in the global smart-device market. This requires the company to gather better market understanding, along with more competitor and product intelligence. Therefore, the chances of finding opportunities to improve current products or emerge into new markets. I have been tasked to focus on one of Bellabeat’s products and conduct analysis on smart device data to gather insights in how consumers use their smart devices. The insights I discover will be used to provide guidance for the company’s marketing strategy, concerning the selected product. My analysis and recommendations will be presented to my stakeholders. The business problem can be summarised as, **"How do our consumers utilise our smart-devices for keeping tabs of their daily activities?"**
+
+## Stakeholders
+#### * Urška Sršen - Bellabeat co-founder and Chief Creative Officer.  
+#### * Sando Mur - Bellabeat co-founder and key member of the Bellabeat executive team.  
+#### * Bellabeat marketing analytics team - A team of data analysts responsible for collecting, analysing, and reporting data to help progress Bellabeat’s marketing strategy.
+
+## Data preparation
+#### I was encouraged to use a public dataset which explores the daily habits of smart-device users. Sršen directly pointed me to FitBit Fitness Tracker Data (a public dataset that was made available thanks to [Mobius](https://www.kaggle.com/arashnic/fitbit)). The dataset is publicly available on Kaggle, the dataset contains consensual personal tracker data of 30 FitBit users. The data included is: information about the user's daily activity, step count, heart rate, sleep monitoring and calories.  The data is organised as a folder with 18 files. The data in each spreadsheet was formatted majorly as long data. I obtained the data from a third party source but after cross checking with the original source (cited by [Mobius](https://zenodo.org/record/53894#.YMoUpnVKiP9)), the data is valid. The data source is comprehensive for the business task and up to date (for the sake of the case study).  In order to use the data, sorting and fishing out relevant data for the business task had to be done. To find relatable trends I will focus on daily summarisations of certain variables like sleep for example.
+
+\newpage
+
+## Install packages
+```{r}
+install.packages("tidyverse")
+install.packages("ggplot2")
+install.packages("scales")
+```
+## Load packages
+```{r}
+library(tidyverse) 
+library(ggplot2)
+library(scales)
+```
+## Importing packages
+```{r}
+activity <- read.csv("dailyActivity_merged.csv")
+calories <- read.csv("dailyCalories_merged.csv")
+intensities <- read.csv("dailyIntensities_merged.csv")
+steps <- read.csv("dailySteps_merged.csv")
+sleep <- read.csv("sleepDay.csv")
+weight <- read.csv("weightLogInfo_merged.csv")
+
+```
+\newpage
+
+## Processing the data
+#### I previewed the data in Excel, then to double-check everything had been imported correctly I used the view() and head() functions.
+```{r}
+head(activity)
+head(calories)
+head(intensities)
+head(steps)
+head(sleep)
+head(weight)
+```
+## Fixing the format
+#### There were some formatting issues with various sections of the data. The data was converted to a date time format and then separated as date and time.
+```{r}
+# activity 
+activity$ActivityDate=as.POSIXct(activity$ActivityDate, 
+                                 format="%m/%d/%Y", tz=Sys.timezone())
+activity$date <- format(activity$ActivityDate, format = "%d/%m/%y")
+# calories
+calories$ActivityDay=
+  as.POSIXct(calories$ActivityDay, 
+             format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+calories$date <- format(calories$ActivityDay, format = "%d/%m/%Y")
+# intensities
+intensities$ActivityDay=
+  as.POSIXct(intensities$ActivityDay,
+             format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+intensities$date <- format(intensities$ActivityDay, format = "%m/%d/%Y")
+# sleep
+sleep$SleepDay=as.POSIXct(sleep$SleepDay,
+                          format="%m/%d/%Y %I:%M:%S %p", tz=Sys.timezone())
+sleep$date <- format(sleep$SleepDay, format = "%d/%m/%y")
+# steps
+steps$ActivityDay=as.POSIXct(intensities$ActivityDay, 
+                             format="%m/%d/%Y", tz=Sys.timezone())
+steps$date <- format(steps$ActivityDay, format = "%m/%d/%y")
+# weight
+weight$Date=as.POSIXct(weight$Date, format ="%m/%d/%Y", tz=Sys.timezone())
+weight$date <- format(weight$Date, format = "%m/%d/%y")
+
+```
+## Exploring data
+
+```{r}
+n_distinct(activity$Id)
+n_distinct(calories$Id)
+n_distinct(intensities$Id)
+n_distinct(sleep$Id)
+n_distinct(steps$Id)
+n_distinct(weight$Id)
+```
+#### The information above shows that some participants did not provide data for some variables. There were 33 participants in this study, 24 provided sleep data and only 8 provided weight data. Based on the fact only 8 participants provided weight data, I decided it was best to not include the weight dataset. 8 participants is a small sample and not enough to provide conclusions or recommendations.
+
+## Merging and cleaning the data
+#### The activity dataset contains all the data of from the other imported datasets except the weight and sleep data. I merged the activity and sleep data via outer join. I believe the sleep data has a lot of possible insights as it is a big factor that impacts our livelihood. 
+
+```{r}
+merged_data <- merge(sleep, activity,  by = c("Id","date")) %>% 
+  drop_na() %>%          
+  select(-SleepDay, -TrackerDistance, -ActivityDate )   
+head(merged_data)
+```
+
+## Data summary
+```{r}
+  summary(merged_data)
+```
+## Findings of merged data
+#### *Average sedentary time is 724 minutes or 12 hours, this is half of the 24 hours each human has been gifted with, lifestyle changes should be made, however, this easier said than done! 
+#### *Most of the participants are lightly active. 
+#### *On the average, participants sleep 1 time for 7 hours. 
+#### *Average total steps per day are 8598 which is less than the recommended 10000 steps. According to CDC's [research](https://www.cdc.gov/physicalactivity/basics/adults/). 10000 steps is roughly 5 miles, which is the number said to help reduce certain health conditions, like heart disease and high blood pressure.
+
+#### In order to make some profound findings, it was neccessary to make a new table and group participants based on their intensity minutes.
+
+-----
+
+```{r}
+usertype <- merged_data %>%
+summarise(
+user_type = factor(case_when(
+    SedentaryMinutes > mean(SedentaryMinutes) & LightlyActiveMinutes
+    < mean(LightlyActiveMinutes) & 
+      FairlyActiveMinutes < mean(FairlyActiveMinutes) &
+      VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Sedentary",
+    SedentaryMinutes < mean(SedentaryMinutes) & 
+      LightlyActiveMinutes > mean(LightlyActiveMinutes) &
+      FairlyActiveMinutes < mean(FairlyActiveMinutes) &
+      VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Lightly Active",
+    SedentaryMinutes < mean(SedentaryMinutes) &
+      LightlyActiveMinutes < mean(LightlyActiveMinutes) &
+      FairlyActiveMinutes > mean(FairlyActiveMinutes) &
+      VeryActiveMinutes < mean(VeryActiveMinutes) ~ "Fairly Active",
+    SedentaryMinutes < mean(SedentaryMinutes) &
+      LightlyActiveMinutes < mean(LightlyActiveMinutes) &
+      FairlyActiveMinutes < mean(FairlyActiveMinutes) &
+      VeryActiveMinutes > mean(VeryActiveMinutes) ~ "Very Active",
+),levels=c("Sedentary", "Lightly Active", "Fairly Active", "Very Active")),
+Calories, .group=Id) %>%
+drop_na()
+```
+
+```{r,fig.align='center',out.extra='angle=0', echo=FALSE}
+usertype %>%
+group_by(user_type) %>%
+summarise(group_total = n()) %>%
+mutate(total = sum(group_total)) %>%
+group_by(user_type)%>%
+  summarise(total_percentage = group_total/total) %>%
+  arrange(desc(user_type)) %>%
+  mutate(total_percentage)%>%
+
+  ggplot(aes(x="", y=total_percentage, fill=user_type)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y")  + labs(title="Participants activity summary", x = NULL,
+                           y = "") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual( values = c("Sedentary" = "purple",
+                                "Lightly Active" = "blue",
+                                "Fairly Active" = "red",
+                                "Very Active" = "yellow")) +
+  theme(text = element_text(size = 10),plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+```{r,fig.align='center',out.extra='angle=0', echo=FALSE}
+ggplot(usertype, aes(user_type, Calories, fill=user_type)) +
+    geom_boxplot(outlier.colour="black", outlier.shape=8,
+                outlier.size=4) +
+    theme(legend.position="none") +
+    labs(title="Calories burned by User type", x="Participant category") +
+    theme(legend.position="none",
+          text = element_text(size = 10),
+          plot.title = element_text(hjust = 0.5)) + 
+  scale_fill_manual( values = c("Sedentary" = "purple",
+                                "Lightly Active" = "blue", 
+                                "Fairly Active" = "red", 
+                                "Very Active" = "yellow"))
+```
+
+
+#### I struggled to place the percentages on to the pie chart in the way I wanted to. I decided to just place a relating table below to care of any questions.
+```{r}
+usertype %>%
+group_by(user_type) %>%
+summarise(group_total = n()) %>%
+mutate(total = sum(group_total)) %>%
+group_by(user_type)%>%
+  summarise(total_percentage = group_total*100/total) 
+```
+
+### Analysis
+#### It is not surprising to see that majority of the participants were classed as sendentary or lightly active. The world we live in geared towards sendentary lifestyles as it is very common to do jobs that inlcude a lot of seated activity (9-5 office jobs). I was not surprised by the smallest group being the very active. There could be a possiblity of Bellabeats formulating programmes for people of different groups to stay active and gradually improve to a higher group, or maintaoning activity that suits the individual's lifestyle.  There is an outlier in terms of the box plot visual, it was expected that the fairly active group would have burned more calories than the sedentary and light active groups. However, I believe this could be down to the minutes performing fairly active activity. Nonetheless, the remainder of the box plot visual reiterates the belief that a greater level of activity expends more energy, hence burning more calories. Additionally, notifications that notify users they have been sitting for an hour, this could help users be more mindful about the time they have spend in seated posistions.
+
+-----
+
+```{r}
+ggplot(data= merged_data, aes(x=TotalSteps, y=Calories)) + 
+  geom_point() + geom_smooth() + labs(title="Total Steps vs. Calories") + 
+  theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 10))
+
+```
+
+
+### Analysis
+#### Positive correlation is displayed by the above visualisation. The more active a person is the more likely they are to burn more calories. However, correlation does not always equate cause, there are several factors that determine a person's calorie output, such as weight, metabolism, age, hormone levels and diet. Bellabeats could utilise notifications that help individuals reach steps goals, with encouraging messages like **"keep up the momentum!"**.
+
+-----
+```{r}
+ggplot(data=merged_data, aes(x=TotalMinutesAsleep, y=TotalTimeInBed )) + 
+geom_point(color='red') + geom_smooth(color='black', method = "lm") +
+  labs(title="Minutes Asleep vs. Minutes In Bed", 
+       x= "Minutes Asleep", y= "Minutes In Bed") +
+  theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 10))
+```
+
+
+### Analysis
+#### The relationship between time in bed and time spent sleeping is strongly positive. Bellabeats could make a notifications prompting users to go to sleep. Users could be able set a bedtime schedule that helps users to be organised and have a routine. 
+
+-----
+
+```{r}
+ggplot(data=merged_data, aes(x=TotalMinutesAsleep, y=SedentaryMinutes)) + 
+geom_point(color='purple') + geom_smooth(color='black') +
+  labs(title="Minutes Asleep vs. Sedentary Minutes",
+       x= "Minutes Asleep", y= "Sedentary Minutes") + 
+  theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 10))
+```
+
+
+### Analysis
+#### The visual above presents negative correlation between minutes spent asleep and time spent in sedentary positions. A reason for people with high amount of sedentary minutes can be down to being sleep deprived and requiring positions that expend less energy. Again this puts emphasis on the need for smart device functions that help progress healthier sleep habits. However, more data on other factors such as job occupation and commuting time need to be collected to allow a solid conclusion to be made.
+
+-----
+
+## Share and Act - Business recommendations
+#### * Product choice - __Time__, my product choice was between the Leaf and Time product because the Fitbit is similar to these two Bellabeat products. The other products such as the Bellabeat membership and Spring were not considered as the data-set provided was sufficient enough to spark marketing ideas for the two products. I believe changes done to the Time product should automatically incorporated in the Bellabeat app. 
+#### * Target audience - Women working full-time in office jobs (9-5) were the target audience based on intensity and sedentary time data. As aforementioned, the participants were assumed to be females for the sake of the case study. 
+#### __Main marketing message__  
+#### * Bellabeat should be centered around information and inspiration, allowing them to feel empowered and potentially positively impact people around them.
+#### __Ideas__  
+#### * Step goals - Users would be allowed set their own personal step goals. The smartwatch should give prompts during the day. The prompts could be encouraging phrases or educative information like "__10,000 steps regularly a day can reduce the chance of having heart related diseases__". 
+#### * Motion tracking - The smartwatch would be able to prompt you to stand up each hour if you have been in a sedentary position 10 minutes before the next hour commences. This would help people be mindful of how long they stay seated for.  
+#### * Sleep notifications - A setting should be implemented, where users can set bedtime schedules and recieve prompts to go to bed. Notifications such as "__time to turn off electronics close to your bed__", could be beneficial to users.
+#### __Recommendations__
+#### * There was no data relating to stress, there may be a relationship between sleeping and stress levels that could be explored. However, research will have to be done to determine an accurate method for smart-devices to measure stress levels. 
+#### *Data surrounding weight loss could be explored as there are several people struggling with losing weight or maintaining a desired weight.
+
+## Thank you for your time!
